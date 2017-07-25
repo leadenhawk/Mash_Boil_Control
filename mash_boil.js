@@ -34,7 +34,7 @@ var V31 = new blynk.VirtualPin(31); // VP31 - overshoot value
 var undershoot = 2;
 var overshoot = 5;
 
-//startup
+// J5 startup
 blynk.on('connect', function() { console.log("Blynk ready."); });
 blynk.on('disconnect', function() { console.log("DISCONNECT"); });
 board.on("ready", function() {
@@ -97,7 +97,7 @@ setInterval(function() {
 
 
 /*
-// ON/OFF element control logic
+// simple ON/OFF element control logic
 setInterval(function() {
   if ( temp < setTemp ) {
     event.emit('V2',1);       // broadcasts V2 = 1 (on)
@@ -164,25 +164,27 @@ function millis() {
   return n;
 }
 
-// PID
+// Conversion from Brett Beauregard's PID tutorials
 
+// ready to implement the Tuning Changes
+// http://brettbeauregard.com/blog/2011/04/improving-the-beginner%E2%80%99s-pid-tuning-changes/
+
+// variables
 var lastTime = millis();
 var Input, Output, Setpoint;
 var errSum = 0;
-var lastErr;
+var lastInput;
 var kp, ki, kd;
+var SampleTime;
 
-var SampleTime = 1000;
-
-
+// Setup
+SetSampleTime(1000);
 SetTunings(5, 0.01, 0.1);
 //console.log(kp, kd, ki);
-
-
 var WindowSize = 5000;
 windowStartTime = millis();
 
-
+// PID code
 function Compute() {
   if ( temp != undefined ) {
     //nathan added this to convert the Brett Beauregard code with existing code
@@ -203,20 +205,19 @@ function Compute() {
       // Compute all the working error variables
       var error = Setpoint - Input;
       //console.log("error: ", error);
-      errSum += (error * timeChange);
+      errSum += error;
       //console.log("errSum: ", errSum);
-      var dErr = (error - lastErr) / timeChange;
+      var dInput = (Input - lastInput);
       //console.log("dErr: ", dErr);
 
 
       //Compute PID Output
-      Output = kp * error + ki * errSum + kd * dErr;
+      Output = kp * error + ki * errSum - kd * dInput;
       console.log("Output: ", Output);
 
 
       //Remember some variables for next time
-      lastErr = error;
-      //console.log("lastErr: ", lastErr);
+      lastInput = Input;
       lastTime = now;
     }
   }
