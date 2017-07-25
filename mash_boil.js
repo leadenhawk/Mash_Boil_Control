@@ -166,14 +166,13 @@ function millis() {
 
 // Conversion from Brett Beauregard's PID tutorials
 
-// ready to implement the Tuning Changes
-// http://brettbeauregard.com/blog/2011/04/improving-the-beginner%E2%80%99s-pid-tuning-changes/
+// ready to implement the Reset Windup
+// http://brettbeauregard.com/blog/2011/04/improving-the-beginner%E2%80%99s-pid-reset-windup/
 
 // variables
 var lastTime = millis();
 var Input, Output, Setpoint;
-var errSum = 0;
-var lastInput;
+var ITerm = 0, lastInput;
 var kp, ki, kd;
 var SampleTime;
 
@@ -205,14 +204,13 @@ function Compute() {
       // Compute all the working error variables
       var error = Setpoint - Input;
       //console.log("error: ", error);
-      errSum += error;
-      //console.log("errSum: ", errSum);
+      ITerm += (ki * error);
       var dInput = (Input - lastInput);
       //console.log("dErr: ", dErr);
 
 
       //Compute PID Output
-      Output = kp * error + ki * errSum - kd * dInput;
+      Output = kp * error + ITerm - kd * dInput;
       console.log("Output: ", Output);
 
 
