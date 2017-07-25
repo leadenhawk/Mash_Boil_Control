@@ -18,12 +18,6 @@ var blynk = new Blynk.Blynk(AUTH, options = {
 var V0 = new blynk.VirtualPin(0);   // Virtual Pin 0 - for temperature (DS18B20)
 var temp;
 
-var prevTemp;
-var nowTemp;
-var change;
-var raising = false;
-var falling = false;
-
 var V1 = new blynk.VirtualPin(1);   // Virtual Pin 1 - ON/OFF button for the led (in place of the pump)
 var V2 = new blynk.VirtualPin(2);   // Virtual Pin 2 - Blynk LED for the led (in place of the element)
 
@@ -56,7 +50,6 @@ board.on("ready", function() {
 
   // J5 code - this reads the thermometer and stores it in variable temp
   thermo.on("change", function() {
-    //prevTemp = temp;
     temp = this.celsius;
   });
 
@@ -95,74 +88,16 @@ board.on("ready", function() {
 });
 
 // Blynk code - a 1/2 sec loop WRITING actual temp and set temp TO BLYNK (for history graph)
-// also sets prevTemp and works out the change in temperature
-// and determines temperature direction
 setInterval(function() {
   if ( temp != undefined ) {
-
-    prevTemp = nowTemp;
-    nowTemp = temp;
-    change = nowTemp - prevTemp;
-
-    if ( change > 0 ) {
-      raising = true;
-      falling = false;
-    }
-    else if ( change < 0 ) {
-      raising = false;
-      falling = true;
-    }
-    else {
-      raising = false;
-      falling = false;
-    }
-
-    if ( DEBUG ) { console.log('nowTemp:', nowTemp + ' C'); }
-      V0.write(nowTemp);
-  }
-  if ( prevTemp != undefined ) {
-    if ( DEBUG ) {console.log ('prevTemp:', prevTemp + ' C'); }
-    if ( DEBUG ) {console.log ('change:', change + ' C'); }
-    if ( DEBUG ) {console.log ('raising:', raising); }
-    if ( DEBUG ) {console.log ('falling:', falling); }
+    if ( DEBUG ) { console.log('Temp:', temp + ' C'); }
+    V0.write(temp);
   }
 }, 500);
 
-// element control logic - this is not trouble-shooted as the theory is flawed! 
-setInterval(function() {
-  if ( nowTemp < setTemp) {   //(raising = true) && (falling = false) ){
-    if ( nowTemp + overshoot < setTemp ) {
-      event.emit('V2', 1);        // broadcasts V2 = 1 (element on)
-      if ( elementState == 1 ){   // IF the element master switch is ON...
-        V2.write(255);            // writes 255 (full led) to LED in Blynk app
-      } else {                    // IF not...
-        V2.write(0);              // turns blynk led off
-      }
-    } else {
-      event.emit('V2', 0);        // broadcasts V2 = 0 (element off)
-    }
-  } else{//if ( (raising = false) && (falling = true) ) {
-    if ( nowTemp - undershoot < setTemp ) {
-      event.emit('V2', 1);        // broadcasts V2 = 1 (element on)
-      if ( elementState == 1 ){   // IF the element master switch is ON...
-        V2.write(255);            // writes 255 (full led) to LED in Blynk app
-      } else {                    // IF not...
-        V2.write(0);              // turns blynk led off
-      }
-    } else {
-      event.emit('V2', 0);        // broadcasts V2 = 0 (element off)
-    }
-
-  } /*else {
-    event.emit('V2', 0);
-  }
-  */
-}, 100);
-
-
 
 /*
-// simple element control logic
+// ON/OFF element control logic
 setInterval(function() {
   if ( temp < setTemp ) {
     event.emit('V2',1);       // broadcasts V2 = 1 (on)
@@ -178,6 +113,7 @@ setInterval(function() {
   }
 }, 100);
 */
+
 
 // Blynk code - a 5 sec loop WRITING temp TO BLYNK
 setInterval(function() {
@@ -220,3 +156,116 @@ V10.on('write', function(param){
   if ( DEBUG ) { console.log("V10 ", param); }
   event.emit('V10',param);
 });
+
+// A function I wrote that does the same as the Arduino millis() function
+function millis() {
+  var d = new Date();
+  var n = d.getTime();
+  return n;
+}
+
+// PID
+
+var lastTime = millis();
+var Input, Output, Setpoint;
+var errSum = 0;
+var lastErr;
+var kp, ki, kd;
+
+var SampleTime = 1000;
+
+
+SetTunings(5, 0.01, 0.1);
+//console.log(kp, kd, ki);
+
+
+var WindowSize = 5000;
+windowStartTime = millis();
+
+
+function Compute() {
+  if ( temp != undefined ) {
+    //nathan added this to convert the Brett Beauregard code with existing code
+    Setpoint = setTemp;
+    Input = temp;
+    //console.log("temp: ", temp);
+    //console.log("Setpoint: ", Setpoint);
+    //console.log("Input: ", Input);
+
+
+    // How long since we lasat calculated
+    var now = millis();
+    var timeChange = now - lastTime;
+    //console.log("timeChange: ",timeChange);
+    if(timeChange>=SampleTime) {
+
+
+      // Compute all the working error variables
+      var error = Setpoint - Input;
+      //console.log("error: ", error);
+      errSum += (error * timeChange);
+      //console.log("errSum: ", errSum);
+      var dErr = (error - lastErr) / timeChange;
+      //console.log("dErr: ", dErr);
+
+
+      //Compute PID Output
+      Output = kp * error + ki * errSum + kd * dErr;
+      console.log("Output: ", Output);
+
+
+      //Remember some variables for next time
+      lastErr = error;
+      //console.log("lastErr: ", lastErr);
+      lastTime = now;
+    }
+  }
+}
+
+var Kp;
+var Ki;
+var Kd;
+
+function SetTunings(Kp, Ki, Kd) {
+  var SampleTimeInSec = (SampleTime)/1000;
+  kp = Kp;
+  ki = Ki * SampleTimeInSec;
+  kd = Kd / SampleTimeInSec;
+}
+
+var NewSampleTime;
+function SetSampleTime(NewSampleTime){
+  if (NewSampleTime > 0) {
+    var ratio  = NewSampleTime / SampleTime;
+    ki *= ratio;
+    kd /= ratio;
+    SampleTime = NewSampleTime;
+  }
+}
+
+
+//This is the function that calls the PID code and controls the relay
+setInterval(function() {
+  // call the PID code
+  Compute();
+
+  // turn the element on/off based on pid output (taken from Arduino PID RelayOutput Example)
+  var now = millis();
+
+  if ( now - windowStartTime > WindowSize ) { //time to shift the Relay Window
+    windowStartTime += WindowSize;
+  }
+
+  if ( Output > now - windowStartTime ) {
+    event.emit('V2',1);       // turn on the element!
+    if ( elementState == 1 ){ // IF the element master switch is ON...
+      V2.write(255);          // writes 255 (full led) to LED in Blynk app
+    } else {                  // IF not...
+      V2.write(0);            // turns off
+    }
+  }
+  else {
+    event.emit('V2',0);       // turn off the element!
+    V2.write(0);
+  }
+}, SampleTime);
