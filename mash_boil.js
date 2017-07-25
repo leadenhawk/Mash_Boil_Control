@@ -165,9 +165,11 @@ function millis() {
 }
 
 // Conversion from Brett Beauregard's PID tutorials
+// On/Off & Initialization tutorials not implemented(!)
+// Direction tutorial not implemented as not relevant
 
-// ready to implement the On/Off
-// http://brettbeauregard.com/blog/2011/04/improving-the-beginner%E2%80%99s-pid-onoff/
+// Ready to implement Proportional on Measurement
+// http://brettbeauregard.com/blog/2017/06/proportional-on-measurement-the-code/
 
 // variables
 var lastTime = millis();
@@ -177,9 +179,10 @@ var kp, ki, kd;
 var SampleTime;
 var outMin, outMax;
 
+
 // Setup
 SetSampleTime(1000);
-SetTunings(5, 0.01, 0.1);
+SetTunings(5, 0.1, 1);
 //console.log(kp, kd, ki);
 var WindowSize = 5000;
 windowStartTime = millis();
@@ -199,9 +202,8 @@ function Compute() {
     var now = millis();
     var timeChange = now - lastTime;
     //console.log("timeChange: ",timeChange);
+    
     if(timeChange>=SampleTime) {
-
-
       // Compute all the working error variables
       var error = Setpoint - Input;
       //console.log("error: ", error);
@@ -258,6 +260,7 @@ function SetOutputLimits(Min, Max){
   if ( ITerm > outMax ) { ITerm = outMax; }
   else if ( ITerm < outMin ) { ITerm = outMin; }
 }
+
 
 
 
