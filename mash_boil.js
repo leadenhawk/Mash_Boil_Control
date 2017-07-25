@@ -11,12 +11,18 @@ var DEBUG = true; //false;
 // Setup Blynk
 var blynk = new Blynk.Blynk(AUTH, options = {
   // Connecteur au serveur Blynk local - Local Blynk server connector
-  connector : new Blynk.TcpClient( options = { addr:"192.168.1.72", port:8442 } )
+  connector : new Blynk.TcpClient( options = { addr:"192.168.1.74", port:8442 } )
 });
 
 //set Virtual Pins and associated variables
 var V0 = new blynk.VirtualPin(0);   // Virtual Pin 0 - for temperature (DS18B20)
 var temp;
+
+var prevTemp;
+var nowTemp;
+var change;
+var raising = false;
+var falling = false;
 
 var V1 = new blynk.VirtualPin(1);   // Virtual Pin 1 - ON/OFF button for the led (in place of the pump)
 var V2 = new blynk.VirtualPin(2);   // Virtual Pin 2 - Blynk LED for the led (in place of the element)
@@ -25,13 +31,13 @@ var V10 = new blynk.VirtualPin(10); // VirtualPin 10 - ON/OFF button for master 
 var elementState = 0;
 
 var V5 = new blynk.VirtualPin(5);   // VirtualPin 5 - SLIDER for Set Temp
-var setTemp = 25;
+var setTemp = 0;
 
 var V6 = new blynk.VirtualPin(6);
 
 var V30 = new blynk.VirtualPin(30); // VP30 - undershoot value
 var V31 = new blynk.VirtualPin(31); // VP31 - overshoot value
-var undershoot = 10;
+var undershoot = 2;
 var overshoot = 5;
 
 //startup
@@ -50,6 +56,7 @@ board.on("ready", function() {
 
   // J5 code - this reads the thermometer and stores it in variable temp
   thermo.on("change", function() {
+    //prevTemp = temp;
     temp = this.celsius;
   });
 
@@ -88,14 +95,74 @@ board.on("ready", function() {
 });
 
 // Blynk code - a 1/2 sec loop WRITING actual temp and set temp TO BLYNK (for history graph)
+// also sets prevTemp and works out the change in temperature
+// and determines temperature direction
 setInterval(function() {
   if ( temp != undefined ) {
-    if ( DEBUG ) { console.log('Temp:', temp + ' C'); }
-    V0.write(temp);
+
+    prevTemp = nowTemp;
+    nowTemp = temp;
+    change = nowTemp - prevTemp;
+
+    if ( change > 0 ) {
+      raising = true;
+      falling = false;
+    }
+    else if ( change < 0 ) {
+      raising = false;
+      falling = true;
+    }
+    else {
+      raising = false;
+      falling = false;
+    }
+
+    if ( DEBUG ) { console.log('nowTemp:', nowTemp + ' C'); }
+      V0.write(nowTemp);
+  }
+  if ( prevTemp != undefined ) {
+    if ( DEBUG ) {console.log ('prevTemp:', prevTemp + ' C'); }
+    if ( DEBUG ) {console.log ('change:', change + ' C'); }
+    if ( DEBUG ) {console.log ('raising:', raising); }
+    if ( DEBUG ) {console.log ('falling:', falling); }
   }
 }, 500);
 
-// element control logic
+// element control logic - this is not trouble-shooted as the theory is flawed! 
+setInterval(function() {
+  if ( nowTemp < setTemp) {   //(raising = true) && (falling = false) ){
+    if ( nowTemp + overshoot < setTemp ) {
+      event.emit('V2', 1);        // broadcasts V2 = 1 (element on)
+      if ( elementState == 1 ){   // IF the element master switch is ON...
+        V2.write(255);            // writes 255 (full led) to LED in Blynk app
+      } else {                    // IF not...
+        V2.write(0);              // turns blynk led off
+      }
+    } else {
+      event.emit('V2', 0);        // broadcasts V2 = 0 (element off)
+    }
+  } else{//if ( (raising = false) && (falling = true) ) {
+    if ( nowTemp - undershoot < setTemp ) {
+      event.emit('V2', 1);        // broadcasts V2 = 1 (element on)
+      if ( elementState == 1 ){   // IF the element master switch is ON...
+        V2.write(255);            // writes 255 (full led) to LED in Blynk app
+      } else {                    // IF not...
+        V2.write(0);              // turns blynk led off
+      }
+    } else {
+      event.emit('V2', 0);        // broadcasts V2 = 0 (element off)
+    }
+
+  } /*else {
+    event.emit('V2', 0);
+  }
+  */
+}, 100);
+
+
+
+/*
+// simple element control logic
 setInterval(function() {
   if ( temp < setTemp ) {
     event.emit('V2',1);       // broadcasts V2 = 1 (on)
@@ -110,6 +177,7 @@ setInterval(function() {
     event.emit('V2',0);       // broadcasts V2 = 0 (off)
   }
 }, 100);
+*/
 
 // Blynk code - a 5 sec loop WRITING temp TO BLYNK
 setInterval(function() {
@@ -125,9 +193,6 @@ setInterval(function() {
   if ( setTemp != undefined ) {
     if ( DEBUG ) { console.log('Set Temp:', setTemp + ' C'); }
   }
-
-
-
 }, 5000);
 
 // Blynk code - RECEIVES V1 button press FROM BLYNK app and broadcasts the change
