@@ -166,8 +166,8 @@ function millis() {
 
 // Conversion from Brett Beauregard's PID tutorials
 
-// ready to implement the Reset Windup
-// http://brettbeauregard.com/blog/2011/04/improving-the-beginner%E2%80%99s-pid-reset-windup/
+// ready to implement the On/Off
+// http://brettbeauregard.com/blog/2011/04/improving-the-beginner%E2%80%99s-pid-onoff/
 
 // variables
 var lastTime = millis();
@@ -175,6 +175,7 @@ var Input, Output, Setpoint;
 var ITerm = 0, lastInput;
 var kp, ki, kd;
 var SampleTime;
+var outMin, outMax;
 
 // Setup
 SetSampleTime(1000);
@@ -205,6 +206,8 @@ function Compute() {
       var error = Setpoint - Input;
       //console.log("error: ", error);
       ITerm += (ki * error);
+      if ( ITerm > outMax ) { ITerm = outMax; }
+      else if ( ITerm < outMin ) { ITern = outMin; }
       var dInput = (Input - lastInput);
       //console.log("dErr: ", dErr);
 
@@ -212,7 +215,8 @@ function Compute() {
       //Compute PID Output
       Output = kp * error + ITerm - kd * dInput;
       console.log("Output: ", Output);
-
+      if ( Output > outMax ) { Output = outMax; }
+      else if ( Output < outMin ) { Output = outMin; }
 
       //Remember some variables for next time
       lastInput = Input;
@@ -241,6 +245,20 @@ function SetSampleTime(NewSampleTime){
     SampleTime = NewSampleTime;
   }
 }
+
+var Min, Max;
+function SetOutputLimits(Min, Max){
+  if ( Min > Max ) return;
+  outMin = Min;
+  outMax = Max;
+
+  if ( Output > outMax ) { Output = outMax; }
+  else if ( Output < outMin ) { Output = outMin; }
+
+  if ( ITerm > outMax ) { ITerm = outMax; }
+  else if ( ITerm < outMin ) { ITerm = outMin; }
+}
+
 
 
 //This is the function that calls the PID code and controls the relay
