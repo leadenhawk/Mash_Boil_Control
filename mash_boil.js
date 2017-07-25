@@ -27,11 +27,12 @@ var elementState = 0;
 var V5 = new blynk.VirtualPin(5);   // VirtualPin 5 - SLIDER for Set Temp
 var setTemp = 25;
 
-var V30 = new blynk.VirtualPin(30)  // VP30 - undershoot
-var V31 = new blynk.VirtualPin(31)  // VP31 - overshoot
+var V6 = new blynk.VirtualPin(6);
+
+var V30 = new blynk.VirtualPin(30); // VP30 - undershoot value
+var V31 = new blynk.VirtualPin(31); // VP31 - overshoot value
 var undershoot = 10;
 var overshoot = 5;
-
 
 //startup
 blynk.on('connect', function() { console.log("Blynk ready."); });
@@ -63,21 +64,6 @@ board.on("ready", function() {
     }
   });
 
-/*
-  // J5 code - this waits for the broadcast of V2, then turns on or off the ele
-    if ( elementState == 1 ){
-      if ( param == 1 || param == true ) {
-        //if ( DEBUG ) { console.log("led/element on"); }
-        ele.on();
-      } else {
-        //if ( DEBUG ) { console.log("led/element off"); }
-        ele.off();
-      }
-    }
-  });
-*/
-
-
   // J5 code - this waits for the broadcast of V2, then turns on or off the ele
   event.on('V2', function(param){
     if (elementState == 1 && ( param == 1 || param == true )) {
@@ -88,24 +74,6 @@ board.on("ready", function() {
       ele.off();
     }
   });
-
-
-/*
-  // J5 code - this waits for the broadcast of V2, then turns on or off the ele
-  event.on('V2', function(param){
-    if ( elementState == 1 ){
-      if ( param == 1 || param == true ) {
-        //if ( DEBUG ) { console.log("led/element on"); }
-        ele.on();
-      }
-    } else if ( elementState == 0 ){
-      if ( param == 0 || param == false ) {
-        //if ( DEBUG ) { console.log("led/element off"); }
-        ele.off();
-      }
-    }
-  });
-*/
 
   // J5 code - this waits for the broadcast of V10 (master element)
   event.on('V10', function(param){
@@ -138,8 +106,8 @@ setInterval(function() {
     }
   }
   else {
-    V2.write(0);          // writes 0 (no led) to LED in Blynk app
-    event.emit('V2',0);   // broadcasts V2 = 0 (off)
+    V2.write(0);              // writes 0 (no led) to LED in Blynk app
+    event.emit('V2',0);       // broadcasts V2 = 0 (off)
   }
 }, 100);
 
@@ -157,6 +125,9 @@ setInterval(function() {
   if ( setTemp != undefined ) {
     if ( DEBUG ) { console.log('Set Temp:', setTemp + ' C'); }
   }
+
+
+
 }, 5000);
 
 // Blynk code - RECEIVES V1 button press FROM BLYNK app and broadcasts the change
@@ -176,6 +147,7 @@ V5.on('write', function(param){
   if ( DEBUG ) { console.log("V5 ", param); }
   event.emit('V5',param);
   setTemp = param;
+  V6.write(setTemp);
 });
 
 // Blynk code - RECEIVES master element V10 button from FROM BLYNK and broadcasts the change
