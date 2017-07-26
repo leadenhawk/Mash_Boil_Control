@@ -174,7 +174,7 @@ function millis() {
 // variables
 var lastTime = millis();
 var Input, Output, Setpoint;
-var ITerm = 0, lastInput;
+var outputSum = 0, lastInput = 0;
 var kp, ki, kd;
 var SampleTime;
 var outMin, outMax;
@@ -186,6 +186,7 @@ SetTunings(5, 0.1, 1);
 //console.log(kp, kd, ki);
 var WindowSize = 5000;
 windowStartTime = millis();
+
 
 // PID code
 function Compute() {
@@ -202,20 +203,28 @@ function Compute() {
     var now = millis();
     var timeChange = now - lastTime;
     //console.log("timeChange: ",timeChange);
-    
+
     if(timeChange>=SampleTime) {
       // Compute all the working error variables
       var error = Setpoint - Input;
       //console.log("error: ", error);
-      ITerm += (ki * error);
-      if ( ITerm > outMax ) { ITerm = outMax; }
-      else if ( ITerm < outMin ) { ITern = outMin; }
       var dInput = (Input - lastInput);
-      //console.log("dErr: ", dErr);
+      //console.log("Input: ", Input);
+      //console.log("lastInput: ", lastInput);
+      outputSum += (ki * error);
+      //console.log("outputSum-ki: ", outputSum);
 
+      // Compute PID Output
+      outputSum -= kp * dInput;
+      //console.log("kp: ", kp);
+      //console.log("dInput: ", dInput);
+      //console.log("outputSum-kp: ", outputSum);
 
-      //Compute PID Output
-      Output = kp * error + ITerm - kd * dInput;
+      if ( outputSum > outMax ) { outputSum = outMax; }
+      else if ( outputSum < outMin ) { outputSum = outMin; }
+
+      // Compute Rest of PID Output
+      Output = outputSum - kd * dInput;
       console.log("Output: ", Output);
       if ( Output > outMax ) { Output = outMax; }
       else if ( Output < outMin ) { Output = outMin; }
