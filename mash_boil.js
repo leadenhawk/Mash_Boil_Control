@@ -29,11 +29,6 @@ var setTemp = 0;
 
 var V6 = new blynk.VirtualPin(6);
 
-var V30 = new blynk.VirtualPin(30); // VP30 - undershoot value
-var V31 = new blynk.VirtualPin(31); // VP31 - overshoot value
-var undershoot = 2;
-var overshoot = 5;
-
 // J5 startup
 blynk.on('connect', function() { console.log("Blynk ready."); });
 blynk.on('disconnect', function() { console.log("DISCONNECT"); });
@@ -115,22 +110,6 @@ setInterval(function() {
 */
 
 
-// Blynk code - a 5 sec loop WRITING temp TO BLYNK
-setInterval(function() {
-  if ( undershoot != undefined ) {
-    if ( DEBUG ) { console.log('Undershoot:', undershoot + ' C'); }
-    V30.write(undershoot);
-  }
-  if ( overshoot != undefined ) {
-    if ( DEBUG ) { console.log('Overshoot:', overshoot + ' C'); }
-    V31.write(overshoot);
-  }
-
-  if ( setTemp != undefined ) {
-    if ( DEBUG ) { console.log('Set Temp:', setTemp + ' C'); }
-  }
-}, 5000);
-
 // Blynk code - RECEIVES V1 button press FROM BLYNK app and broadcasts the change
 V1.on('write', function(param){
   if ( DEBUG ) { console.log("V1 ", param); }
@@ -180,7 +159,7 @@ var outMin, outMax;
 
 // Setup
 SetSampleTime(50);
-SetTunings(25, 25, 50);
+SetTunings(25, 50, 25);
 
 //console.log(kp, kd, ki);
 var WindowSize = 5000;
@@ -194,39 +173,27 @@ function Compute() {
     //nathan added this to convert the Brett Beauregard code with existing code
     Setpoint = setTemp;
     Input = temp;
-    //console.log("temp: ", temp);
-    //console.log("Setpoint: ", Setpoint);
-    //console.log("Input: ", Input);
-
 
     // How long since we lasat calculated
     var now = millis();
     var timeChange = now - lastTime;
-    //console.log("timeChange: ",timeChange);
+    if ( timeChange >= SampleTime ) {
 
-    if(timeChange>=SampleTime) {
       // Compute all the working error variables
       var error = Setpoint - Input;
-      console.log("error: ", error);
       var dInput = (Input - lastInput);
-      //console.log("Input: ", Input);
-      //console.log("lastInput: ", lastInput);
+
+      // Compute I Output
       outputSum += (ki * error);
-      //console.log("outputSum-ki: ", outputSum);
 
-      // Compute PID Output
+      // Compute P Output
       outputSum -= kp * dInput;
-      //console.log("kp: ", kp);
-      //console.log("dInput: ", dInput);
-      //console.log("outputSum-kp: ", outputSum);
-
       if ( outputSum > outMax ) { outputSum = outMax; }
       else if ( outputSum < outMin ) { outputSum = outMin; }
 
-      // Compute Rest of PID Output
+      // Compute D Output and sum PID Output
       Output = outputSum - kd * dInput;
-      console.log("Output: ", Output);
-
+      if ( DEBUG ) { console.log("Output: ", Output); }
       if ( Output > outMax ) { Output = outMax; }
       else if ( Output < outMin ) { Output = outMin; }
 
@@ -242,15 +209,15 @@ var Ki;
 var Kd;
 
 function SetTunings(Kp, Ki, Kd) {
-  var SampleTimeInSec = (SampleTime)/1000;
+  var SampleTimeInSec = SampleTime / 1000;
   kp = Kp;
   ki = Ki * SampleTimeInSec;
   kd = Kd / SampleTimeInSec;
 }
 
 var NewSampleTime;
-function SetSampleTime(NewSampleTime){
-  if (NewSampleTime > 0) {
+function SetSampleTime ( NewSampleTime ) {
+  if ( NewSampleTime > 0 ) {
     var ratio  = NewSampleTime / SampleTime;
     ki *= ratio;
     kd /= ratio;
