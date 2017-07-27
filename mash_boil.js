@@ -164,12 +164,10 @@ function millis() {
   return n;
 }
 
-// Conversion from Brett Beauregard's PID tutorials
-// On/Off & Initialization tutorials not implemented(!)
-// Direction tutorial not implemented as not relevant
-
-// Ready to implement Proportional on Measurement
-// http://brettbeauregard.com/blog/2017/06/proportional-on-measurement-the-code/
+// Converted from Brett Beauregard's PID tutorials
+// converted to Proportional on Measurement rather than on Error.
+// http://brettbeauregard.com/blog/2017/06/introducing-proportional-on-measurement/
+// On/Off & Initialization & Direction tutorials not implemented
 
 // variables
 var lastTime = millis();
@@ -181,11 +179,13 @@ var outMin, outMax;
 
 
 // Setup
-SetSampleTime(1000);
-SetTunings(5, 0.1, 1);
+SetSampleTime(50);
+SetTunings(25, 25, 50);
+
 //console.log(kp, kd, ki);
 var WindowSize = 5000;
 windowStartTime = millis();
+SetOutputLimits(0, WindowSize);
 
 
 // PID code
@@ -207,7 +207,7 @@ function Compute() {
     if(timeChange>=SampleTime) {
       // Compute all the working error variables
       var error = Setpoint - Input;
-      //console.log("error: ", error);
+      console.log("error: ", error);
       var dInput = (Input - lastInput);
       //console.log("Input: ", Input);
       //console.log("lastInput: ", lastInput);
@@ -226,6 +226,7 @@ function Compute() {
       // Compute Rest of PID Output
       Output = outputSum - kd * dInput;
       console.log("Output: ", Output);
+
       if ( Output > outMax ) { Output = outMax; }
       else if ( Output < outMin ) { Output = outMin; }
 
@@ -266,14 +267,19 @@ function SetOutputLimits(Min, Max){
   if ( Output > outMax ) { Output = outMax; }
   else if ( Output < outMin ) { Output = outMin; }
 
-  if ( ITerm > outMax ) { ITerm = outMax; }
-  else if ( ITerm < outMin ) { ITerm = outMin; }
+  if ( outputSum > outMax ) { outputSum = outMax; }
+  else if ( outputSum < outMin ) { outputSum = outMin; }
 }
 
 
-
-
 //This is the function that calls the PID code and controls the relay
+
+/*First we decide on a window size (5000mS say.) We then
+ * set the pid to adjust its output between 0 and that window
+ * size.  Lastly, we add some logic that translates the PID
+ * output into "Relay On Time" with the remainder of the
+ * window being "Relay Off Time"*/
+
 setInterval(function() {
   // call the PID code
   Compute();
@@ -292,8 +298,7 @@ setInterval(function() {
     } else {                  // IF not...
       V2.write(0);            // turns off
     }
-  }
-  else {
+  } else {
     event.emit('V2',0);       // turn off the element!
     V2.write(0);
   }
