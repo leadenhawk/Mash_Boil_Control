@@ -15,19 +15,29 @@ var blynk = new Blynk.Blynk(AUTH, options = {
 });
 
 //set Virtual Pins and associated variables
-var V0 = new blynk.VirtualPin(0);   // Virtual Pin 0 - for temperature (DS18B20)
+var V0 = new blynk.VirtualPin(0);   // for temperature (DS18B20)
 var temp;
 
-var V1 = new blynk.VirtualPin(1);   // Virtual Pin 1 - ON/OFF button for the led (in place of the pump)
-var V2 = new blynk.VirtualPin(2);   // Virtual Pin 2 - Blynk LED for the led (in place of the element)
+var V1 = new blynk.VirtualPin(1);   // ON/OFF button for the led (in place of the pump)
+var V2 = new blynk.VirtualPin(2);   // Blynk LED for the led (in place of the element)
 
-var V10 = new blynk.VirtualPin(10); // VirtualPin 10 - ON/OFF button for master element control
-var elementState = 0;
-
-var V5 = new blynk.VirtualPin(5);   // VirtualPin 5 - SLIDER for Set Temp
+var V5 = new blynk.VirtualPin(5);   // SLIDER for Set Temp
 var setTemp = 0;
 
-var V6 = new blynk.VirtualPin(6);
+var V6 = new blynk.VirtualPin(6);   // Displays Set Temp on Blynk Interface
+
+var V8 = new blynk.VirtualPin(8);   // SLIDER for manual Temp
+var manTemp = 0;
+
+var V10 = new blynk.VirtualPin(10); // ON/OFF button for master element control
+var elementState = 0;
+
+var V12 = new blynk.VirtualPin(12); // PID/MAN button for element control mode
+var inAuto = 1;
+
+var V15 = new blynk.VirtualPin(15); // Displays Output % on Blynk Interface
+
+
 
 // J5 startup
 blynk.on('connect', function() { console.log("Blynk ready."); });
@@ -42,6 +52,12 @@ board.on("ready", function() {
     controller: "DS18B20",
     pin: 10   //Arduino pin 10 - DS18B20
   });
+
+  // sent the actual states & values to the Blynk Interface
+  V5.write(setTemp);
+  V8.write(manTemp);
+  V10.write(elementState);
+  V12.write(inAuto);
 
   // J5 code - this reads the thermometer and stores it in variable temp
   thermo.on("change", function() {
@@ -62,10 +78,10 @@ board.on("ready", function() {
   // J5 code - this waits for the broadcast of V2, then turns on or off the ele
   event.on('V2', function(param){
     if (elementState == 1 && ( param == 1 || param == true )) {
-      //if ( DEBUG ) { console.log("led/element on"); }
+      if ( DEBUG ) { console.log("led/element on"); }
       ele.on();
     } else {
-      //if ( DEBUG ) { console.log("led/element off"); }
+      if ( DEBUG ) { console.log("led/element off"); }
       ele.off();
     }
   });
@@ -80,21 +96,40 @@ board.on("ready", function() {
       elementState = 0;
     }
   });
+
+  // J5 code - this waits for the broadcast of V12 (element mode)
+  event.on('V12', function(param){
+  console.log(param);
+    if ( param == 1 || param == true ) {
+      if ( DEBUG ) { console.log("PID mode"); }
+      inAuto = 1;
+    } else {
+      if ( DEBUG ) { console.log("Manual mode"); }
+      inAuto = 0;
+    }
+  });
+
 });
 
-// Blynk code - a 1/2 sec loop WRITING actual temp and set temp TO BLYNK (for history graph)
+
+// Blynk code - a 1/2 sec loop WRITING temp and output TO BLYNK (for history graph)
 setInterval(function() {
   if ( temp != undefined ) {
     if ( DEBUG ) { console.log('Temp:', temp + ' C'); }
     V0.write(temp);
   }
+  if ( Output != undefined ) {
+    var outputAsPercent = Output * (100/WindowSize);
+    if ( DEBUG ) { console.log('Output:', outputAsPercent + ' %'); }
+    V15.write(outputAsPercent);
+  }
 }, 500);
 
 
 /*
-// simple ON/OFF element control logic
+// simple ON/OFF element control logic - made redundant by PID control
 setInterval(function() {
-  if ( temp < setTemp ) {
+  if ( temp < setTemp ) {     // IF the temp is below the setTemp...
     event.emit('V2',1);       // broadcasts V2 = 1 (on)
     if ( elementState == 1 ){ // IF the element master switch is ON...
       V2.write(255);          // writes 255 (full led) to LED in Blynk app
@@ -102,7 +137,7 @@ setInterval(function() {
       V2.write(0);            // turns off
     }
   }
-  else {
+  else {                      // IF the temp is not below the setTemp...
     V2.write(0);              // writes 0 (no led) to LED in Blynk app
     event.emit('V2',0);       // broadcasts V2 = 0 (off)
   }
@@ -136,6 +171,22 @@ V10.on('write', function(param){
   event.emit('V10',param);
 });
 
+// Blynk code - RECEIVES master element V10 button from FROM BLYNK and broadcasts the change
+V12.on('write', function(param){
+  if ( DEBUG ) { console.log("V12 ", param); }
+  event.emit('V12',param);
+});
+
+// Blynk code - RECEIVES set Temp V8 slider from FROM BLYNK and broadcasts the change
+V8.on('write', function(param){
+  if ( DEBUG ) { console.log("V8 ", param); }
+  event.emit('V8',param);
+  manTemp = param;
+});
+
+
+
+
 // A function I wrote that does the same as the Arduino millis() function
 function millis() {
   var d = new Date();
@@ -156,8 +207,8 @@ var kp, ki, kd;
 var SampleTime;
 var outMin, outMax;
 
-
 // Setup
+//SetMode(true);    //true = auto (PID mode) - false = manual (PID off)
 SetSampleTime(50);
 SetTunings(25, 50, 25);
 
@@ -166,9 +217,9 @@ var WindowSize = 5000;
 windowStartTime = millis();
 SetOutputLimits(0, WindowSize);
 
-
 // PID code
 function Compute() {
+  if(!inAuto) return;
   if ( temp != undefined ) {
     //nathan added this to convert the Brett Beauregard code with existing code
     Setpoint = setTemp;
@@ -193,7 +244,7 @@ function Compute() {
 
       // Compute D Output and sum PID Output
       Output = outputSum - kd * dInput;
-      if ( DEBUG ) { console.log("Output: ", Output); }
+      //if ( DEBUG ) { console.log("Output: ", Output); }
       if ( Output > outMax ) { Output = outMax; }
       else if ( Output < outMin ) { Output = outMin; }
 
@@ -238,6 +289,24 @@ function SetOutputLimits(Min, Max){
   else if ( outputSum < outMin ) { outputSum = outMin; }
 }
 
+/*
+var Mode;
+function SetMode(Mode) {
+  var newAuto = ( Mode == true );
+  if ( newAuto == !inAuto )
+  {  //we just went from manual to auto
+    Initialize();
+  }
+  inAuto = newAuto;
+}
+
+function Initialize() {
+  lastInput = Input;
+  outputSum = Output;
+  if ( outputSum > outMax ) outputSum = outMax;
+  else if ( outputSum < outMin ) outputSum = outMin;
+}
+*/
 
 //This is the function that calls the PID code and controls the relay
 
@@ -247,9 +316,16 @@ function SetOutputLimits(Min, Max){
  * output into "Relay On Time" with the remainder of the
  * window being "Relay Off Time"*/
 
+function manualMode() {
+  if(inAuto) return;
+  Output = manTemp * ( WindowSize / 100 );
+}
+
+
 setInterval(function() {
-  // call the PID code
-  Compute();
+  // only 1 of the following will actually run
+  Compute();     // call the PID mode code
+  manualMode();  // call the Manual mode code
 
   // turn the element on/off based on pid output (taken from Arduino PID RelayOutput Example)
   var now = millis();
