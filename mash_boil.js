@@ -1,3 +1,10 @@
+// The basis for this project and the first section of this code was forked from diyprojects.io. 
+// See https://diyprojects.io/iot-development-based-orange-pi-arduino-firmata-nodejs-blynk-johnny-five/#.WXrV8ohLc1I
+// The PID contol section draws (very) heavily on Brett Beauregard's PID tutorial series, including the June 2017 articles on PonM
+// See http://brettbeauregard.com/blog/2017/06/introducing-proportional-on-measurement/
+// The very last section of code on using the PID output with a relay draws (very) heavily from the Arduino Playground example
+// See https://playground.arduino.cc/Code/PIDLibraryRelayOutputExample
+
 var Blynk = require('/home/nathan/node_modules/blynk-library');
 var five = require("/home/nathan/node_modules/johnny-five");
 var EventEmitter = require('events').EventEmitter;
@@ -281,11 +288,11 @@ function Compute() {
   if(!inAuto) return; // doesn't calc PID when in manual mode
   if(elementState == 0) return; //turns off the PID calcs when the master switch is off
   if ( temp != undefined ) {
-    //nathan added this to convert the Brett Beauregard code with existing code
+    //I added this to integrate the Brett Beauregard code with my existing (pre-written) code
     Setpoint = setTemp;
     Input = temp;
 
-    // How long since we lasat calculated
+    // How long since we last calculated
     var now = millis();
     var timeChange = now - lastTime;
     if ( timeChange >= SampleTime ) {
@@ -347,7 +354,15 @@ function SetOutputLimits(Min, Max){
   else if ( outputSum < outMin ) { outputSum = outMin; }
 }
 
-//This is the function that calls the PID code and controls the relay
+
+// This function is for controlling the element in Manual mode
+function manualMode() {
+  if(inAuto) return;
+  Output = manTemp * ( WindowSize / 100 );
+}
+
+
+//This is the function that calls the (PID & manual) code and controls the relay
 
 /*First we decide on a window size (5000mS say.) We then
  * set the pid to adjust its output between 0 and that window
@@ -355,18 +370,12 @@ function SetOutputLimits(Min, Max){
  * output into "Relay On Time" with the remainder of the
  * window being "Relay Off Time"*/
 
-function manualMode() {
-  if(inAuto) return;
-  Output = manTemp * ( WindowSize / 100 );
-}
-
-
 setInterval(function() {
   // only 1 of the following will actually run
   Compute();     // call the PID mode code
   manualMode();  // call the Manual mode code
 
-  // turn the element on/off based on pid output (taken from Arduino PID RelayOutput Example)
+  // turn the element on/off based on (pid) output (taken from Arduino PID RelayOutput Example)
   var now = millis();
 
   if ( now - windowStartTime > WindowSize ) { //time to shift the Relay Window
