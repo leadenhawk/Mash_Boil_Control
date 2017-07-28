@@ -78,10 +78,10 @@ board.on("ready", function() {
   // J5 code - this waits for the broadcast of V2, then turns on or off the ele
   event.on('V2', function(param){
     if (elementState == 1 && ( param == 1 || param == true )) {
-      if ( DEBUG ) { console.log("led/element on"); }
+      //if ( DEBUG ) { console.log("led/element on"); }
       ele.on();
     } else {
-      if ( DEBUG ) { console.log("led/element off"); }
+      //if ( DEBUG ) { console.log("led/element off"); }
       ele.off();
     }
   });
@@ -121,7 +121,7 @@ setInterval(function() {
   if ( Output != undefined ) {
     var outputAsPercent = Output * (100/WindowSize);
     if ( DEBUG ) { console.log('Output:', outputAsPercent + ' %'); }
-    V15.write(outputAsPercent);
+    V15.write(outputAsPercent.toFixed(1));
   }
 }, 500);
 
