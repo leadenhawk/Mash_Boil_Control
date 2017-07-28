@@ -19,6 +19,8 @@ var V0 = new blynk.VirtualPin(0);   // for temperature (DS18B20)
 var temp;
 
 var V1 = new blynk.VirtualPin(1);   // ON/OFF button for the led (in place of the pump)
+var pumpState = 0;
+
 var V2 = new blynk.VirtualPin(2);   // Blynk LED for the led (in place of the element)
 
 var V5 = new blynk.VirtualPin(5);   // SLIDER for Set Temp
@@ -37,6 +39,15 @@ var inAuto = 1;
 
 var V15 = new blynk.VirtualPin(15); // Displays Output % on Blynk Interface
 
+var V20 = new blynk.VirtualPin(20); // Displays P value
+var V21 = new blynk.VirtualPin(21); // Displays I value
+var V22 = new blynk.VirtualPin(22); // Displays D value
+var V23 = new blynk.VirtualPin(23); // Displays SampleTime value
+
+var V25 = new blynk.VirtualPin(25); // STEP for P value
+var V26 = new blynk.VirtualPin(26); // STEP for I value
+var V27 = new blynk.VirtualPin(27); // STEP for D value
+var V28 = new blynk.VirtualPin(28); // STEP for SampleTime value
 
 
 // J5 startup
@@ -54,6 +65,7 @@ board.on("ready", function() {
   });
 
   // sent the actual states & values to the Blynk Interface
+  V1.write(pumpState);
   V5.write(setTemp);
   V8.write(manTemp);
   V10.write(elementState);
@@ -69,9 +81,11 @@ board.on("ready", function() {
     if ( param == 1 || param == true ) {
       if ( DEBUG ) { console.log("led/pump on"); }
       led.on();
+      pumpState = 1;
     } else {
       if ( DEBUG ) { console.log("led/pump off"); }
       led.off();
+      pumpState = 0;
     }
   });
 
@@ -112,7 +126,7 @@ board.on("ready", function() {
 });
 
 
-// Blynk code - a 1/2 sec loop WRITING temp and output TO BLYNK (for history graph)
+// Blynk code - a 1/2 sec loop WRITING temp and output TO BLYNK
 setInterval(function() {
   if ( temp != undefined ) {
     if ( DEBUG ) { console.log('Temp:', temp + ' C'); }
@@ -125,6 +139,16 @@ setInterval(function() {
   }
 }, 500);
 
+
+setInterval(function() {    // updates Blynk interface with...
+  V1.write(pumpState);      // pump on/off
+  V10.write(elementState);  // element on/off
+  V12.write(inAuto);        // element mode
+  V20.write(kp);            // kp value
+  V21.write(ki);            // ki value
+  V22.write(kd);            // kd value
+  V23.write(SampleTime);    // SampleTime value
+}, 100);
 
 /*
 // simple ON/OFF element control logic - made redundant by PID control
@@ -184,6 +208,41 @@ V8.on('write', function(param){
   manTemp = param;
 });
 
+// Blynk code - RECEIVES P V25 step from FROM BLYNK and broadcasts the change
+V25.on('write', function(param){
+  if ( DEBUG ) { console.log("V25 ", param); }
+  event.emit('V25',param);
+  var paramToNumber = Number(param);
+  Kp += paramToNumber;
+  SetTunings(Kp, Ki, Kd);
+});
+
+// Blynk code - RECEIVES I V26 step from FROM BLYNK and broadcasts the change
+V26.on('write', function(param){
+  if ( DEBUG ) { console.log("V26 ", param); }
+  event.emit('V26',param);
+  var paramToNumber = Number(param);
+  Ki += paramToNumber;
+  SetTunings(Kp, Ki, Kd);
+});
+
+// Blynk code - RECEIVES D V27 step from FROM BLYNK and broadcasts the change
+V27.on('write', function(param){
+  if ( DEBUG ) { console.log("V27 ", param); }
+  event.emit('V27',param);
+  var paramToNumber = Number(param);
+  Kd += paramToNumber;
+  SetTunings(Kp, Ki, Kd);
+});
+
+// Blynk code - RECEIVES SampleTime V28 step from FROM BLYNK and broadcasts the change
+V28.on('write', function(param){
+  if ( DEBUG ) { console.log("V28 ", param); }
+  event.emit('V28',param);
+  var paramToNumber = Number(param);
+  SampleTime += paramToNumber;
+  SetSampleTime(SampleTime);
+});
 
 
 
@@ -206,11 +265,11 @@ var outputSum = 0, lastInput = 0;
 var kp, ki, kd;
 var SampleTime;
 var outMin, outMax;
+var Kp = 25, Ki = 50, Kd = 25;
 
 // Setup
-//SetMode(true);    //true = auto (PID mode) - false = manual (PID off)
 SetSampleTime(50);
-SetTunings(25, 50, 25);
+SetTunings(Kp, Ki, Kd);
 
 //console.log(kp, kd, ki);
 var WindowSize = 5000;
@@ -219,7 +278,8 @@ SetOutputLimits(0, WindowSize);
 
 // PID code
 function Compute() {
-  if(!inAuto) return;
+  if(!inAuto) return; // doesn't calc PID when in manual mode
+  if(elementState == 0) return; //turns off the PID calcs when the master switch is off
   if ( temp != undefined ) {
     //nathan added this to convert the Brett Beauregard code with existing code
     Setpoint = setTemp;
@@ -255,15 +315,12 @@ function Compute() {
   }
 }
 
-var Kp;
-var Ki;
-var Kd;
-
 function SetTunings(Kp, Ki, Kd) {
   var SampleTimeInSec = SampleTime / 1000;
   kp = Kp;
   ki = Ki * SampleTimeInSec;
   kd = Kd / SampleTimeInSec;
+
 }
 
 var NewSampleTime;
@@ -273,6 +330,7 @@ function SetSampleTime ( NewSampleTime ) {
     ki *= ratio;
     kd /= ratio;
     SampleTime = NewSampleTime;
+
   }
 }
 
@@ -288,25 +346,6 @@ function SetOutputLimits(Min, Max){
   if ( outputSum > outMax ) { outputSum = outMax; }
   else if ( outputSum < outMin ) { outputSum = outMin; }
 }
-
-/*
-var Mode;
-function SetMode(Mode) {
-  var newAuto = ( Mode == true );
-  if ( newAuto == !inAuto )
-  {  //we just went from manual to auto
-    Initialize();
-  }
-  inAuto = newAuto;
-}
-
-function Initialize() {
-  lastInput = Input;
-  outputSum = Output;
-  if ( outputSum > outMax ) outputSum = outMax;
-  else if ( outputSum < outMin ) outputSum = outMin;
-}
-*/
 
 //This is the function that calls the PID code and controls the relay
 
