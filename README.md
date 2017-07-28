@@ -1,5 +1,5 @@
 # Mash_Boil_Control
-Mash and boil control using Johnny-5 library on an Arduino via a Blynk android interface using a local Blynk server on Orange Pi
+This project is a Mash and boil controller for my electric BIAB homebrew system; this uses the Johnny-Five library on an Arduino via a Blynk android interface using a local Blynk server on Orange Pi. The Orange Pi also runs the JS code.
 
 The Arduino Uno is flashed with ConfigurableFirmata via the Arduino IDE.
 
