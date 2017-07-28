@@ -61,7 +61,7 @@ var V28 = new blynk.VirtualPin(28); // STEP for SampleTime value
 blynk.on('connect', function() { console.log("Blynk ready."); });
 blynk.on('disconnect', function() { console.log("DISCONNECT"); });
 board.on("ready", function() {
-  console.log("Johnny-five is Alive!");
+  console.log("Arduino Connected... (Johnny-Five is alive!)");
 
   // set physical pins
   var led = new five.Led(11);  //Arduino pin 11 - led (in place of pump)
@@ -71,7 +71,7 @@ board.on("ready", function() {
     pin: 10   //Arduino pin 10 - DS18B20
   });
 
-  // sent the actual states & values to the Blynk Interface
+  // send the actual states & values to the Blynk Interface
   V1.write(pumpState);
   V5.write(setTemp);
   V8.write(manTemp);
