@@ -4,8 +4,11 @@ Mash and boil control using Johnny-5 library on an Arduino via a Blynk android i
 The Arduino Uno is flashed with ConfigurableFirmata via the Arduino IDE.
 
 Aduino Pin          Hardware
+
   9        ==>     Element +ve
+  
   10       ==>     DS18B20 data
+  
   11       ==>     Pump +ve
   
   
