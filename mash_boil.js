@@ -137,7 +137,7 @@ board.on("ready", function() {
 setInterval(function() {
   if ( temp != undefined ) {
     if ( DEBUG ) { console.log('Temp:', temp + ' C'); }
-    V0.write(temp);
+    V0.write(temp.toFixed(1));
   }
   if ( Output != undefined ) {
     var outputAsPercent = Output * (100/WindowSize);
