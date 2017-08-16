@@ -272,14 +272,14 @@ var outputSum = 0, lastInput = 0;
 var kp, ki, kd;
 var SampleTime;
 var outMin, outMax;
-var Kp = 25, Ki = 50, Kd = 25;
+var Kp = 7500, Ki = 75, Kd = 0;
 
 // Setup
 SetSampleTime(50);
 SetTunings(Kp, Ki, Kd);
 
 //console.log(kp, kd, ki);
-var WindowSize = 5000;
+var WindowSize = 10000;
 windowStartTime = millis();
 SetOutputLimits(0, WindowSize);
 
